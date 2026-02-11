@@ -20,8 +20,15 @@ fi
 sudo docker build -t "$IMAGE_NAME" .
 
 # Stop and remove existing container (ignore errors if not running)
-sudo docker stop "$CONTAINER_NAME" || true
-sudo docker rm "$CONTAINER_NAME" || true
+sudo docker stop "$CONTAINER_NAME" 2>/dev/null || true
+sudo docker rm "$CONTAINER_NAME" 2>/dev/null || true
+
+# Also kill any container using port 80 (from old deployments)
+OLD_CONTAINER=$(sudo docker ps -q --filter "publish=80" 2>/dev/null)
+if [ -n "$OLD_CONTAINER" ]; then
+  sudo docker stop "$OLD_CONTAINER" || true
+  sudo docker rm "$OLD_CONTAINER" || true
+fi
 
 # Run the new container
 sudo docker run -d --name "$CONTAINER_NAME" -p 80:80 "$IMAGE_NAME"
