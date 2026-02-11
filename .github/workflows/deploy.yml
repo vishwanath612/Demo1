@@ -20,5 +20,13 @@ jobs:
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          cd ~/deploy
+          # Clone repo if first time, otherwise pull latest
+          if [ -d ~/app/.git ]; then
+            cd ~/app && git pull origin main
+          else
+            rm -rf ~/app
+            git clone https://github.com/vishwanath612/Demo1.git ~/app
+            cd ~/app
+          fi
+          chmod +x deploy.sh
           ./deploy.sh

@@ -1,16 +1,29 @@
 #!/bin/bash
+set -e
 
-# Navigate to the deployment directory
-cd /home/ubuntu
+REPO_URL="https://github.com/vishwanath612/Demo1.git"
+APP_DIR="/home/ubuntu/app"
+CONTAINER_NAME="my-app-container"
+IMAGE_NAME="my-app"
 
-# Pull the latest code
-git clone hhttps://github.com/vishwanath612/Demo1.git app || (cd app && git pull origin main)
+# Clone the repo if it doesn't exist, otherwise pull latest
+if [ -d "$APP_DIR/.git" ]; then
+  cd "$APP_DIR"
+  git pull origin main
+else
+  rm -rf "$APP_DIR"
+  git clone "$REPO_URL" "$APP_DIR"
+  cd "$APP_DIR"
+fi
 
-# Build and run the Docker container
-cd app
-sudo docker build -t my-app .
-sudo docker stop my-app-container || true
-sudo docker rm my-app-container || true
-sudo docker run -d --name my-app-container -p 80:80 my-app
+# Build the Docker image
+sudo docker build -t "$IMAGE_NAME" .
+
+# Stop and remove existing container (ignore errors if not running)
+sudo docker stop "$CONTAINER_NAME" || true
+sudo docker rm "$CONTAINER_NAME" || true
+
+# Run the new container
+sudo docker run -d --name "$CONTAINER_NAME" -p 80:80 "$IMAGE_NAME"
 
 echo "Deployment completed successfully!"
