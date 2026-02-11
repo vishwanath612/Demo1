@@ -22,7 +22,9 @@ jobs:
         script: |
           # Clone repo if first time, otherwise pull latest
           if [ -d ~/app/.git ]; then
-            cd ~/app && git pull origin main
+            cd ~/app
+            git fetch origin main
+            git reset --hard origin/main
           else
             rm -rf ~/app
             git clone https://github.com/vishwanath612/Demo1.git ~/app
