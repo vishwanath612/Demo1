@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Simple Car Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Car Racing Game</title>
 
     <style>
         * {
@@ -13,71 +14,130 @@
         }
 
         body {
-            background: #222;
+            background: #111;
             overflow: hidden;
             font-family: Arial, sans-serif;
+            transition: 0.5s;
         }
 
         /* Game Area */
         .gameArea {
             width: 400px;
             height: 100vh;
-            background: #444;
             margin: auto;
             position: relative;
             overflow: hidden;
-            border-left: 5px solid white;
-            border-right: 5px solid white;
+            background: linear-gradient(#555, #333);
+            border-left: 5px solid #fff;
+            border-right: 5px solid #fff;
         }
 
-        /* Road lines */
-        .line {
-            width: 10px;
-            height: 100px;
-            background: white;
+        /* Rain */
+        .rain {
             position: absolute;
-            left: 195px;
+            width: 2px;
+            height: 15px;
+            background: rgba(255, 255, 255, 0.5);
+            animation: rainFall linear infinite;
         }
 
-        /* Player Car */
-        .car {
-            width: 50px;
-            height: 100px;
-            background: rgb(165, 17, 17);
-            position: absolute;
-            bottom: 120px;
-            left: 175px;
-            border-radius: 10px;
+        @keyframes rainFall {
+            from {
+                transform: translateY(-100px);
+            }
+
+            to {
+                transform: translateY(100vh);
+            }
         }
 
-        /* Enemy Cars */
+        /* Cars */
+        .car,
         .enemy {
-            width: 50px;
-            height: 100px;
-            background: yellow;
+            width: 60px;
+            height: 120px;
             position: absolute;
-            border-radius: 10px;
+            background-size: contain;
+            background-repeat: no-repeat;
         }
 
-        /* Score */
-        .score {
+        .car {
+            bottom: 120px;
+            left: 170px;
+            background-image: url('player_car.png');
+        }
+
+        .enemy {
+            background-image: url('enemy_car.png');
+        }
+
+        /* UI */
+        .score,
+        .highScore,
+        .level {
             position: absolute;
-            top: 20px;
             left: 20px;
             color: white;
-            font-size: 20px;
+            font-size: 18px;
         }
 
-        /* Start Screen */
+        .score {
+            top: 20px;
+        }
+
+        .highScore {
+            top: 50px;
+        }
+
+        .level {
+            top: 80px;
+        }
+
         .startScreen {
             position: absolute;
             background: white;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
             padding: 20px;
             text-align: center;
             cursor: pointer;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Controls */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 40px;
+        }
+
+        .btn {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 20px;
+        }
+
+        /* Steering wheel */
+        .steering {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 100px;
+            background: url('https://i.imgur.com/W3aX9bM.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            opacity: 0.8;
+        }
+
+        /* Night Mode */
+        .night {
+            background: #000;
         }
     </style>
 </head>
@@ -86,115 +146,157 @@
 
     <div class="gameArea"></div>
     <div class="score">Score: 0</div>
-    <div class="startScreen">Click Here To Start<br>Use Arrow Keys To Move</div>
+    <div class="highScore">High Score: 0</div>
+    <div class="level">Level: 1</div>
+    <div class="startScreen">Click To Start<br>Arrow Keys / Buttons / Steering</div>
+
+    <div class="controls">
+        <div class="btn" id="leftBtn">⬅</div>
+        <div class="btn" id="rightBtn">➡</div>
+    </div>
+
+    <div class="steering" id="steering"></div>
+
+    <button onclick="toggleMode()" style="position:absolute;top:20px;right:20px;">🌙</button>
+
+    <!-- Sounds -->
+    <audio id="bgMusic" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop></audio>
+    <audio id="crashSound" src="https://www.soundjay.com/mechanical/sounds/car-crash-1.mp3"></audio>
 
     <script>
-        const score = document.querySelector('.score');
-        const startScreen = document.querySelector('.startScreen');
         const gameArea = document.querySelector('.gameArea');
+        const scoreDisplay = document.querySelector('.score');
+        const highScoreDisplay = document.querySelector('.highScore');
+        const levelDisplay = document.querySelector('.level');
+        const startScreen = document.querySelector('.startScreen');
+        const bgMusic = document.getElementById('bgMusic');
+        const crashSound = document.getElementById('crashSound');
 
-        let player = { speed: 5, score: 0 };
-        let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        let player = { speed: 5, score: 0, level: 1 };
+        let keys = { ArrowLeft: false, ArrowRight: false };
+
+        let highScore = localStorage.getItem("highScore") || 0;
+        highScoreDisplay.innerText = "High Score: " + highScore;
 
         startScreen.addEventListener('click', start);
 
         document.addEventListener('keydown', e => keys[e.key] = true);
         document.addEventListener('keyup', e => keys[e.key] = false);
 
+        document.getElementById('leftBtn').ontouchstart = () => keys.ArrowLeft = true;
+        document.getElementById('leftBtn').ontouchend = () => keys.ArrowLeft = false;
+        document.getElementById('rightBtn').ontouchstart = () => keys.ArrowRight = true;
+        document.getElementById('rightBtn').ontouchend = () => keys.ArrowRight = false;
+
+        /* Steering Control */
+        let steering = document.getElementById('steering');
+        steering.addEventListener('mousemove', e => {
+            let center = steering.getBoundingClientRect().left + 50;
+            if (e.clientX < center) keys.ArrowLeft = true;
+            else keys.ArrowRight = true;
+        });
+
+        /* Rain Effect */
+        function createRain() {
+            for (let i = 0; i < 40; i++) {
+                let drop = document.createElement('div');
+                drop.classList.add('rain');
+                drop.style.left = Math.random() * 400 + "px";
+                drop.style.animationDuration = (0.5 + Math.random()) + "s";
+                gameArea.appendChild(drop);
+            }
+        }
+
+        /* Start Game */
         function start() {
             startScreen.style.display = 'none';
             gameArea.innerHTML = "";
+            createRain();
             player.start = true;
             player.score = 0;
+            player.speed = 5;
+            player.level = 1;
+            bgMusic.play();
 
             let car = document.createElement('div');
-            car.setAttribute('class', 'car');
+            car.classList.add('car');
             gameArea.appendChild(car);
-
             player.x = car.offsetLeft;
-            player.y = car.offsetTop;
-
-            for (let i = 0; i < 5; i++) {
-                let roadLine = document.createElement('div');
-                roadLine.setAttribute('class', 'line');
-                roadLine.y = i * 150;
-                roadLine.style.top = roadLine.y + "px";
-                gameArea.appendChild(roadLine);
-            }
 
             for (let i = 0; i < 3; i++) {
                 let enemy = document.createElement('div');
-                enemy.setAttribute('class', 'enemy');
+                enemy.classList.add('enemy');
                 enemy.y = (i + 1) * -300;
-                enemy.style.left = Math.floor(Math.random() * 350) + "px";
+                enemy.style.left = Math.random() * 340 + "px";
                 enemy.style.top = enemy.y + "px";
                 gameArea.appendChild(enemy);
             }
-
-            window.requestAnimationFrame(playGame);
+            requestAnimationFrame(playGame);
         }
 
-        function moveLines() {
-            let lines = document.querySelectorAll('.line');
-            lines.forEach(item => {
-                if (item.y >= 700) item.y -= 750;
-                item.y += player.speed;
-                item.style.top = item.y + "px";
-            });
+        /* Collision */
+        function isCollide(a, b) {
+            let aRect = a.getBoundingClientRect();
+            let bRect = b.getBoundingClientRect();
+            return !(aRect.bottom < bRect.top ||
+                aRect.top > bRect.bottom ||
+                aRect.right < bRect.left ||
+                aRect.left > bRect.right);
         }
 
         function moveEnemy(car) {
             let enemies = document.querySelectorAll('.enemy');
             enemies.forEach(item => {
                 if (isCollide(car, item)) {
+                    crashSound.play();
                     endGame();
                 }
                 if (item.y >= 750) {
                     item.y = -300;
-                    item.style.left = Math.floor(Math.random() * 350) + "px";
+                    item.style.left = Math.random() * 340 + "px";
                 }
                 item.y += player.speed;
                 item.style.top = item.y + "px";
             });
         }
 
-        function isCollide(a, b) {
-            let aRect = a.getBoundingClientRect();
-            let bRect = b.getBoundingClientRect();
-            return !(
-                aRect.bottom < bRect.top ||
-                aRect.top > bRect.bottom ||
-                aRect.right < bRect.left ||
-                aRect.left > bRect.right
-            );
-        }
-
+        /* Game Loop */
         function playGame() {
             let car = document.querySelector('.car');
             let road = gameArea.getBoundingClientRect();
 
             if (player.start) {
-                moveLines();
                 moveEnemy(car);
 
-                if (keys.ArrowLeft && player.x > 0)
-                    player.x -= player.speed;
-                if (keys.ArrowRight && player.x < (road.width - 50))
-                    player.x += player.speed;
-
+                if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+                if (keys.ArrowRight && player.x < (road.width - 60)) player.x += player.speed;
                 car.style.left = player.x + "px";
 
                 player.score++;
-                score.innerText = "Score: " + player.score;
+                player.speed = 5 + Math.floor(player.score / 500);
+                player.level = 1 + Math.floor(player.score / 1000);
 
-                window.requestAnimationFrame(playGame);
+                scoreDisplay.innerText = "Score: " + player.score;
+                levelDisplay.innerText = "Level: " + player.level;
+
+                requestAnimationFrame(playGame);
             }
         }
 
+        /* End Game */
         function endGame() {
             player.start = false;
+            bgMusic.pause();
+            if (player.score > highScore) {
+                localStorage.setItem("highScore", player.score);
+            }
             startScreen.style.display = 'block';
-            startScreen.innerHTML = "Game Over<br>Final Score: " + player.score + "<br>Click To Restart";
+            startScreen.innerHTML = "Game Over<br>Score: " + player.score + "<br>Click To Restart";
+        }
+
+        /* Day/Night */
+        function toggleMode() {
+            document.body.classList.toggle("night");
         }
     </script>
 
